@@ -1,0 +1,20 @@
+// Saty Pivot Ribbon
+// Copyright (C) 2022 Saty Mahajan
+// A 3 EMA Ribbon system that simplifies measuring and using emas for trend and support/resistance.
+// Special thanks to Ripster for his education and EMA Clouds which inspired this indicator. 
+
+study(title="Saty Pivot Ribbon", shorttitle = "Saty Pivot Ribbon", overlay = true)
+
+fast_ema = input(title = "Fast EMA", defval = 8, minval = 1)
+pivot_ema = input(title = "Pivot EMA", defval = 21, minval = 1)
+slow_ema = input(title = "Slow EMA", defval = 34, minval = 1)
+
+fast_ema_value = ema(close, fast_ema)
+pivot_ema_value = ema(close, pivot_ema)
+slow_ema_value = ema (close, slow_ema)
+
+fast_plot = plot(series = fast_ema_value, title = "Fast EMA", color = color.gray, display = display.none)
+pivot_plot = plot(series = pivot_ema_value, title = "Pivot EMA", color = color.gray, display = display.none)
+slow_plot = plot(series = slow_ema_value, title = "Slow EMA", color = color.gray, display = display.none)
+fill(fast_plot, pivot_plot, color= iff(fast_ema_value>=pivot_ema_value, color.green, color.red), opacity = 40)
+fill(pivot_plot, slow_plot, color = iff(pivot_ema_value>=slow_ema_value, color.blue, color.orange), opacity = 40)
