@@ -1,0 +1,40 @@
+// --- EMA Inputs ---
+ema8_len = define(8, name="EMA 8 Length", min=1)
+ema21_len =define(21, name="EMA 21 Length", min=1)
+ema34_len = define(34, name="EMA 34 Length", min=1)
+
+// --- SMA Inputs ---
+sma50_len = define(50, name="SMA 50 Length", min=1)
+sma100_len = define(100, name="SMA 100 Length", min=1)
+sma200_len = define(200, name="SMA 200 Length", min=1)
+
+// --- Calculate EMAs ---
+ema8 = ind.ema(close, ema8_len)
+ema21 = ind.ema(close, ema21_len)
+ema34 = ind.ema(close, ema34_len)
+
+// --- Calculate SMAs ---
+sma50 = ind.sma(close, sma50_len)
+sma100 = ind.sma(close, sma100_len)
+sma200 = ind.sma(close, sma200_len)
+
+// --- Plot EMAs - Rainbow Colors (ending with 8 EMA in purple) ---
+// Store plot objects for use in fill function
+p_ema8 = plt(ema8, name="EMA 8", color=color.purple) // Purple (Violet)
+p_ema21 = plt(ema21, name="EMA 21", color=color.blue)// Blue
+p_ema34 = plt(ema34, name="EMA 34", color=color.green) // Green
+
+// --- Plot SMAs - Rainbow Colors (starting with 200 SMA in red) ---
+// Store plot objects for use in fill function
+p_sma50 = plt(sma50, name="SMA 50", color=color.yellow) // Yellow
+p_sma100 = plt(sma100, name="SMA 100", color=color.orange) // Orange
+p_sma200 = plt(sma200, name="SMA 200", color=color.red) // Red
+
+// --- Fill between lines to create "rainbow wave" effect ---
+// Using transparent versions of the colors
+plt.fill_between(p_sma200, p_sma100, color=color.orange, opacity=10, name="Fill SMA 200-100") // Transparent Orange
+plt.fill_between(p_sma100, p_sma50, color=color.yellow, opacity=10,name="Fill SMA 100-50") // Transparent Yellow
+plt.fill_between(p_sma50, p_ema34, color=color.green, opacity=10, name="Fill SMA 50-EMA 34") // Transparent Green
+plt.fill_between(p_ema34, p_ema21, color=color.blue, opacity=10, name="Fill EMA 34-21") // Transparent Blue
+plt.fill_between(p_ema21, p_ema8, color=color.purple, opacity=10, name="Fill EMA 21-8") // Transparent Purple
+
