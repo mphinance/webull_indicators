@@ -1,0 +1,61 @@
+// MPHinace I changed and added stuff for webull desktop
+// Saty Pivot Ribbon
+// Copyright (C) 2022 Saty Mahajan
+// A 3 EMA Ribbon system that simplifies measuring and using emas for trend and support/resistance.
+// Special thanks to Ripster for his education and EMA Clouds which inspired this indicator.
+
+// --- EMA Inputs ---
+fast_ema = define(8, name="Fast EMA", min=1)
+pivot_ema = define(21, name="Pivot EMA", min=1)
+slow_ema = define(34, name="Slow EMA", min=1)
+
+// --- SMA Inputs ---
+sma50_len = define(50, name="SMA 50 Length", min=1)
+sma100_len = define(100, name="SMA 100 Length", min=1)
+sma200_len = define(200, name="SMA 200 Length", min=1)
+
+// --- Calculate EMAs ---
+fast_ema_value = ind.ema(close, fast_ema)
+pivot_ema_value = ind.ema(close, pivot_ema)
+slow_ema_value = ind.ema(close, slow_ema)
+
+// --- Calculate SMAs based on current chart's close data ---
+// (Cross-timeframe fetching is not directly supported in Webull based on available functions)
+sma50_value = ind.sma(close, sma50_len)
+sma100_value = ind.sma(close, sma100_len)
+sma200_value = ind.sma(close, sma200_len)
+
+// --- Calculate VWMA ---
+// vwap_value = ind.vwma()
+
+// --- Plot EMAs (hidden, used for fill) ---
+// Using a very low opacity for the line plots themselves as display.none is not directly available.
+p_fast = plt(fast_ema_value, name="Fast EMA", color=color.gray) // Almost transparent gray
+p_pivot = plt(pivot_ema_value, name="Pivot EMA", color=color.gray) // Almost transparent gray
+p_slow = plt(slow_ema_value, name="Pivot EMA", color=color.gray) // Almost transparent gray
+
+// --- Plot SMAs (hidden, used for fill, or just line) ---
+// Using a very low opacity for the line plots themselves if only for fill boundary.
+// sma100 is kept as a visible gray line.
+p_sma50 = plt(sma50_value, name="SMA 50", color=color.gray) // Transparent gray for fill boundary
+p_sma100 = plt(sma100_value, name="SMA 100", color=color.white) // Visible gray line, no fill involving this plot directly
+p_sma200 = plt(sma200_value, name="SMA 200", color=color.gray) // Transparent gray for fill boundary
+
+// --- Plot VWAP ---
+//plt(vwap_value, name="VWAP", color=color.maroon) // Plotting VWAP in Maroon
+
+// --- Define Fill Colors based on conditions for EMAs (Original colors) ---
+fill_color_fp = iff(fast_ema_value >= pivot_ema_value, color.green, color.red)
+fill_color_ps = iff(pivot_ema_value >= slow_ema_value, color.blue, color.orange)
+
+// --- Define Fill Color for SMA 50-200 based on condition ---
+// Green when 50 > 200, otherwise red.
+fill_color_s50_s200 = iff(sma50_value >= sma200_value, color.green, color.red)
+
+// --- Fill between EMA lines to create "ribbon" effect ---
+plt.fill_between(p_fast, p_pivot, color=fill_color_fp, opacity=40, name="Fast-Pivot Fill")
+plt.fill_between(p_pivot, p_slow, color=fill_color_ps, opacity=40, name="Pivot-Slow Fill")
+
+// --- Fill between SMA 50 and SMA 200 lines ---
+// Using opacity=5 as requested
+plt.fill_between(p_sma50, p_sma200, color=fill_color_s50_s200, opacity=5, name="SMA 50-200 Fill")
