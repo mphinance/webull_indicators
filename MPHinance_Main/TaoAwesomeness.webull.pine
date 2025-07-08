@@ -1,8 +1,8 @@
 // MPHinace I changed and added stuff for webull desktop
-// Saty Pivot Ribbon
+// Saty Pivot Ribbon - Main Chart Components
 // Copyright (C) 2022 Saty Mahajan
-// A 3 EMA Ribbon system that simplifies measuring and using emas for trend and support/resistance.
-// Special thanks to Ripster for his education and EMA Clouds which inspired this indicator.
+// This script contains EMAs, Keltner Channels, and RSI-based entry triggers,
+// intended to be plotted on the main price chart.
 
 // --- EMA Inputs ---
 fast_ema = define(8, name="Fast EMA", min=1)
@@ -13,10 +13,6 @@ ema89_len = define(89, name="EMA 89 Length", min=1)
 
 // --- Keltner Channel Inputs ---
 atr_len = define(14, name="ATR Length (Keltner)", min=1)
-
-// --- Stochastic Inputs ---
-stoch_k_len = define(8, name="Stochastic %K Length", min=1)
-stoch_d_len = define(3, name="Stochastic %D Length", min=1)
 
 // --- RSI Input for Entry Triggers ---
 rsi_len = define(2, name="RSI Length (Entry Trigger)", min=1)
@@ -39,10 +35,6 @@ kc_lower2 = pivot_ema_value - (2 * atr_value)
 kc_upper3 = pivot_ema_value + (3 * atr_value)
 kc_lower3 = pivot_ema_value - (3 * atr_value)
 
-// --- Calculate Slow Stochastics (8,3) ---
-stoch_k_value = ind.stoch(stoch_k_len, stoch_d_len)
-stoch_d_value = ind.stoch(stoch_k_len, stoch_d_len, true) // Assuming the third parameter gets Slow %D, if not, remove it.
-
 // --- Calculate RSI(2) for Entry Triggers ---
 rsi_value = ind.rsi(close, rsi_len)
 
@@ -57,35 +49,22 @@ bullish_rsi_trigger = (rsi_value[1] <= 10) and (rsi_value > 10)
 // Bearish: RSI(2) rises above 90 and then crosses back below 90.
 bearish_rsi_trigger = (rsi_value[1] >= 90) and (rsi_value < 90)
 
-// --- Plot EMAs (hidden, used for fill) ---
-// Using color.gray for lines as transparency with color.rgb is not working as expected.
+// --- Plot EMAs (visible lines, used for fill) ---
 p_fast = plt(fast_ema_value, name="Fast EMA", color=color.gray)
 p_pivot = plt(pivot_ema_value, name="Pivot EMA", color=color.gray)
 p_slow = plt(slow_ema_value, name="Slow EMA", color=color.gray)
-p_ema55 = plt(ema55_value, name="EMA 55", color=color.gray)
-p_ema89 = plt(ema89_value, name="EMA 89", color=color.gray)
+p_ema55 = plt(ema55_value, name="EMA 55", color=color.maroon, line_width=2) // Changed to Maroon, thicker
+p_ema89 = plt(ema89_value, name="EMA 89", color=color.navy, line_width=2)   // Changed to Navy, thicker
 
 // --- Plot Keltner Channel Bands ---
-// Using color.teal for the Keltner bands. Varying line_width for distinction.
-plt(kc_upper1, name="KC Upper 1", color=color.teal, line_width=1)
-plt(kc_lower1, name="KC Lower 1", color=color.teal, line_width=1)
-plt(kc_upper2, name="KC Upper 2", color=color.teal, line_width=2)
-plt(kc_lower2, name="KC Lower 2", color=color.teal, line_width=2)
-plt(kc_upper3, name="KC Upper 3", color=color.teal, line_width=3)
-plt(kc_lower3, name="KC Lower 3", color=color.teal, line_width=3)
-
-// --- Plot Slow Stochastics ---
-// Plot %K line, with color based on bullish/bearish setup conditions
-stoch_plot_color = iff(stoch_k_value <= 40, color.lime, // Bullish setup (buy the dip)
-                   iff(stoch_k_value >= 60, color.fuchsia, // Bearish setup (sell the rip)
-                   color.gray)) // Default color when not in setup zone
-
-plt(stoch_k_value, name="Slow Stoch %K", color=stoch_plot_color)
-plt(stoch_d_value, name="Slow Stoch %D", color=color.white) // %D line, typically white or another contrasting color
-
-// --- Plot Stochastic Overbought/Oversold Levels ---
-hline(80, name="Overbought", color=color.red, line_width=1, type=hline.type_dotted)
-hline(20, name="Oversold", color=color.green, line_width=1, type=hline.type_dotted)
+// Using color.teal for the Keltner upper bands, and yellow for lower bands. Varying line_width for distinction.
+// Corrected opacity syntax for all lines.
+p_kc_upper1 = plt(kc_upper1, name="KC Upper 1", color=color.silver, line_width=1, opacity=40)
+p_kc_lower1 = plt(kc_lower1, name="KC Lower 1", color=color.silver, line_width=1, opacity=40) // Changed to Yellow
+p_kc_upper2 = plt(kc_upper2, name="KC Upper 2", color=color.gray, line_width=1, opacity=40)
+p_kc_lower2 = plt(kc_lower2, name="KC Lower 2", color=color.gray, line_width=1, opacity=40) // Changed to Yellow
+p_kc_upper3 = plt(kc_upper3, name="KC Upper 3", color=color.white, line_width=1, opacity=40)
+p_kc_lower3 = plt(kc_lower3, name="KC Lower 3", color=color.white, line_width=1, opacity=40) // Changed to Yellow
 
 // --- Plot Entry Triggers on Main Chart ---
 // Plot bullish entry marker below the low of the bar
@@ -109,3 +88,12 @@ fill_color_ps = iff(pivot_ema_value >= slow_ema_value, color.blue, color.orange)
 // --- Fill between EMA lines to create "ribbon" effect ---
 plt.fill_between(p_fast, p_pivot, color=fill_color_fp, opacity=40, name="Fast-Pivot Fill")
 plt.fill_between(p_pivot, p_slow, color=fill_color_ps, opacity=40, name="Pivot-Slow Fill")
+
+// --- Fill between Keltner Channel Bands (1-2 and 2-3 ATR) ---
+// Upper bands
+plt.fill_between(p_kc_upper1, p_kc_upper2, color=color.teal, opacity=10, name="KC Upper 1-2 Fill")
+plt.fill_between(p_kc_upper2, p_kc_upper3, color=color.teal, opacity=10, name="KC Upper 2-3 Fill")
+
+// Lower bands
+plt.fill_between(p_kc_lower1, p_kc_lower2, color=color.yellow, opacity=10, name="KC Lower 1-2 Fill")
+plt.fill_between(p_kc_lower2, p_kc_lower3, color=color.yellow, opacity=10, name="KC Lower 2-3 Fill")
