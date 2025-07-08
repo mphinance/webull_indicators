@@ -28,20 +28,30 @@ rsi_value = ind.rsi(close, rsi_len)
 
 // --- Plot Slow Stochastics ---
 // Plot %K line, with color based on bullish/bearish setup conditions
-stoch_plot_color = iff(stoch_k_value <= 40, color.lime, // Bullish setup (buy the dip)
-                   iff(stoch_k_value >= 60, color.fuchsia, // Bearish setup (sell the rip)
-                   color.gray)) // Default color when not in setup zone
+// Green when above 60, Yellow when below 40, Gray otherwise.
+stoch_plot_color = iff(stoch_k_value >= 60, color.green, // Green when above 60 (Overbought)
+                   iff(stoch_k_value <= 40, color.yellow, // Yellow when below 40 (Oversold)
+                   color.gray)) // Default color (gray) when in middle zone
 
-plt(stoch_k_value, name="Slow Stoch %K", color=stoch_plot_color)
+p_stoch_k = plt(stoch_k_value, name="Slow Stoch %K", color=stoch_plot_color) // Store plot object for fill
 plt(stoch_d_value, name="Slow Stoch %D", color=color.white) // %D line, typically white or another contrasting color
 
 // --- Plot Stochastic Overbought/Oversold Levels ---
-// Removed styling parameters as hline function signature does not support them directly.
-hline(80) // Overbought level
-hline(20) // Oversold level
+hline(60) // Overbought level
+hline(40) // Oversold level
+
+// --- Fill between Stochastic Overbought/Oversold Levels (40 and 60) ---
+// Create a constant series for the hlines to use in fill_between
+stoch_level_60_series = hline(60) // This will create a plot object for 60
+stoch_level_40_series = hline(40) // This will create a plot object for 40
+
+// Fill between the 40 and 60 levels with a light gray opacity
+plt.fill_between(stoch_level_40_series, stoch_level_60_series, color=color.gray, opacity=10, name="Stoch Middle Fill")
+
 
 // --- Plot RSI(2) ---
-plt(rsi_value, name="RSI(2)", color=color.orange) // Plotting RSI(2) in Orange
+// Plotting RSI(2) in Orange, but hidden by default using display.none
+plt(rsi_value, name="RSI(2)", color=color.orange, display=display.none)
 // You might want to add hlines for RSI levels (e.g., 50, 30, 70) here if needed.
 // hline(50)
 // hline(30)
