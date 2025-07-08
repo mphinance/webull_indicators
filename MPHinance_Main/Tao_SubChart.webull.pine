@@ -1,0 +1,48 @@
+// MPHinace I changed and added stuff for webull desktop
+// Saty Pivot Ribbon - Sub Chart Components (Stochastics & RSI)
+// Copyright (C) 2022 Saty Mahajan
+// This script contains Slow Stochastics, RSI(2), and their respective overbought/oversold levels,
+// intended to be plotted in a separate sub-chart pane.
+
+// --- Stochastic Inputs ---
+stoch_k_len = define(8, name="Stochastic %K Length", min=1)
+stoch_d_len = define(3, name="Stochastic %D Length", min=1) // This is the smoothing for Slow %K and Slow %D
+
+// --- RSI Input ---
+rsi_len = define(2, name="RSI Length", min=1) // RSI length for plotting in sub-chart
+
+// --- Calculate Slow Stochastics (8,3) Manually ---
+// Fast %K = ((Current Close - Lowest Low in %K_len periods) / (Highest High in %K_len periods - Lowest Low in %K_len periods)) * 100
+lowest_low_k = math.lowest(low, stoch_k_len)
+highest_high_k = math.highest(high, stoch_k_len)
+fast_stoch_k = ((close - lowest_low_k) / (highest_high_k - lowest_low_k)) * 100
+
+// Slow %K is SMA of Fast %K
+stoch_k_value = ind.sma(fast_stoch_k, stoch_d_len)
+
+// Slow %D is SMA of Slow %K
+stoch_d_value = ind.sma(stoch_k_value, stoch_d_len)
+
+// --- Calculate RSI(2) ---
+rsi_value = ind.rsi(close, rsi_len)
+
+// --- Plot Slow Stochastics ---
+// Plot %K line, with color based on bullish/bearish setup conditions
+stoch_plot_color = iff(stoch_k_value <= 40, color.lime, // Bullish setup (buy the dip)
+                   iff(stoch_k_value >= 60, color.fuchsia, // Bearish setup (sell the rip)
+                   color.gray)) // Default color when not in setup zone
+
+plt(stoch_k_value, name="Slow Stoch %K", color=stoch_plot_color)
+plt(stoch_d_value, name="Slow Stoch %D", color=color.white) // %D line, typically white or another contrasting color
+
+// --- Plot Stochastic Overbought/Oversold Levels ---
+// Removed styling parameters as hline function signature does not support them directly.
+hline(80) // Overbought level
+hline(20) // Oversold level
+
+// --- Plot RSI(2) ---
+plt(rsi_value, name="RSI(2)", color=color.orange) // Plotting RSI(2) in Orange
+// You might want to add hlines for RSI levels (e.g., 50, 30, 70) here if needed.
+// hline(50)
+// hline(30)
+// hline(70)
