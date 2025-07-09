@@ -59,12 +59,12 @@ p_ema89 = plt(ema89_value, name="EMA 89", color=color.navy, line_width=2)   // C
 // --- Plot Keltner Channel Bands ---
 // Using color.teal for the Keltner upper bands, and yellow for lower bands. Varying line_width for distinction.
 // Corrected opacity syntax for all lines.
-p_kc_upper1 = plt(kc_upper1, name="KC Upper 1", color=color.silver, line_width=1, opacity=40)
-p_kc_lower1 = plt(kc_lower1, name="KC Lower 1", color=color.silver, line_width=1, opacity=40) // Changed to Yellow
-p_kc_upper2 = plt(kc_upper2, name="KC Upper 2", color=color.gray, line_width=1, opacity=40)
-p_kc_lower2 = plt(kc_lower2, name="KC Lower 2", color=color.gray, line_width=1, opacity=40) // Changed to Yellow
-p_kc_upper3 = plt(kc_upper3, name="KC Upper 3", color=color.white, line_width=1, opacity=40)
-p_kc_lower3 = plt(kc_lower3, name="KC Lower 3", color=color.white, line_width=1, opacity=40) // Changed to Yellow
+p_kc_upper1 = plt(kc_upper1, name="KC Upper 1", color=color.silver, line_width=1, opacity=20)
+p_kc_lower1 = plt(kc_lower1, name="KC Lower 1", color=color.silver, line_width=1, opacity=20) // Changed to Yellow
+p_kc_upper2 = plt(kc_upper2, name="KC Upper 2", color=color.gray, line_width=1, opacity=20)
+p_kc_lower2 = plt(kc_lower2, name="KC Lower 2", color=color.gray, line_width=1, opacity=20) // Changed to Yellow
+p_kc_upper3 = plt(kc_upper3, name="KC Upper 3", color=color.white, line_width=1, opacity=20)
+p_kc_lower3 = plt(kc_lower3, name="KC Lower 3", color=color.white, line_width=1, opacity=10) // Changed to Yellow
 
 // --- Plot Entry Triggers on Main Chart ---
 // Plot bullish entry marker below the low of the bar
@@ -86,14 +86,14 @@ fill_color_fp = iff(fast_ema_value >= pivot_ema_value, color.green, color.red)
 fill_color_ps = iff(pivot_ema_value >= slow_ema_value, color.blue, color.orange)
 
 // --- Fill between EMA lines to create "ribbon" effect ---
-plt.fill_between(p_fast, p_pivot, color=fill_color_fp, opacity=40, name="Fast-Pivot Fill")
-plt.fill_between(p_pivot, p_slow, color=fill_color_ps, opacity=40, name="Pivot-Slow Fill")
+plt.fill_between(p_fast, p_pivot, color=fill_color_fp, opacity=30, name="Fast-Pivot Fill")
+plt.fill_between(p_pivot, p_slow, color=fill_color_ps, opacity=30, name="Pivot-Slow Fill")
 
 // --- Fill between Keltner Channel Bands (1-2 and 2-3 ATR) ---
 // Upper bands
-plt.fill_between(p_kc_upper1, p_kc_upper2, color=color.teal, opacity=10, name="KC Upper 1-2 Fill")
-plt.fill_between(p_kc_upper2, p_kc_upper3, color=color.teal, opacity=10, name="KC Upper 2-3 Fill")
+plt.fill_between(p_kc_upper1, p_kc_upper2, color=color.teal, opacity=5, name="KC Upper 1-2 Fill")
+plt.fill_between(p_kc_upper2, p_kc_upper3, color=color.teal, opacity=5, name="KC Upper 2-3 Fill")
 
 // Lower bands
-plt.fill_between(p_kc_lower1, p_kc_lower2, color=color.yellow, opacity=10, name="KC Lower 1-2 Fill")
-plt.fill_between(p_kc_lower2, p_kc_lower3, color=color.yellow, opacity=10, name="KC Lower 2-3 Fill")
+plt.fill_between(p_kc_lower1, p_kc_lower2, color=color.yellow, opacity=5, name="KC Lower 1-2 Fill")
+plt.fill_between(p_kc_lower2, p_kc_lower3, color=color.yellow, opacity=5, name="KC Lower 2-3 Fill")
