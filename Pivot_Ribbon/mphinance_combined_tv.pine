@@ -1,0 +1,594 @@
+//@version=6
+indicator("Combined Advanced Trading Blueprint", overlay=true, max_bars_back=500)
+
+// --- Imports ---
+import TradersReality/Traders_Reality_Lib/1 as trLib
+
+// --- Merged Inputs ---
+
+// ███████ Inflection Zones ███████
+poi_group = '███████ Inflection Zones ███████'
+swing_length = input.int(10, title = 'Swing High/Low Length', group = poi_group, minval = 1, maxval = 50)
+history_of_demand_to_keep = input.int(20, title = 'History To Keep', minval = 5, maxval = 50, group = poi_group)
+box_width = input.float(2.5, title = 'Supply/Demand Box Width', group = poi_group, minval = 1, maxval = 10, step = 0.5)
+switch_poi = input.bool(true, title = 'Enable IZ', group = poi_group)
+
+// ██████████ Pivot Levels ██████████
+pivot_group = '██████████ Pivot Levels ██████████'
+pivotTypeInput = input.string(title="Type", defval="Traditional", options=["Traditional", "Fibonacci", "Woodie", "Classic", "DM", "Camarilla"],group=pivot_group)
+pivotAnchorInput = input.string(title="Pivots Timeframe", defval="Auto", options=["Auto", "Daily", "Weekly", "Monthly", "Quarterly", "Yearly", "Biyearly", "Triyearly", "Quinquennially", "Decennially"],group=pivot_group)
+maxHistoricalPivotsInput = input.int(title="Number of Pivots Back", defval=1, minval=1, maxval=200, display = display.data_window,group=pivot_group)
+isDailyBasedInput = input.bool(title="Use Daily-based Values", defval=true,group=pivot_group, display = display.data_window, tooltip="When this option is unchecked, Pivot Points will use intraday data while calculating on intraday charts. If Extended Hours are displayed on the chart, they will be taken into account during the pivot level calculation. If intraday OHLC values are different from daily-based values (normal for stocks), the pivot levels will also differ.")
+showLabelsInput = input.bool(title="Show Labels", defval=true,group=pivot_group, display = display.data_window)
+showPricesInput = input.bool(title="Show Prices", defval=true,group=pivot_group, display = display.data_window)
+positionLabelsInput = input.string("Left", "Labels Position", options=["Left", "Right"],group=pivot_group, display = display.data_window)
+linewidthInput = input.int(title="Line Width", defval=1, minval=1, maxval=100,group=pivot_group, display = display.data_window)
+switch_pivot = input.bool(title="Show Pivot Levels", defval=true, group=pivot_group)
+
+DEFAULT_COLOR = #00CED1
+pColorInput = input.color(DEFAULT_COLOR, "P‏  ‏  ‏", inline="P",group=pivot_group, display = display.data_window)
+pShowInput = input.bool(true, "", inline="P",group=pivot_group, display = display.data_window)
+s1ColorInput = input.color(DEFAULT_COLOR, "S1", inline="S1/R1" ,group=pivot_group, display = display.data_window)
+s1ShowInput = input.bool(true, "", inline="S1/R1",group=pivot_group, display = display.data_window)
+r1ColorInput = input.color(DEFAULT_COLOR, "‏  ‏  ‏  ‏  ‏  ‏  ‏  ‏R1", inline="S1/R1",group=pivot_group, display = display.data_window)
+r1ShowInput = input.bool(true, "", inline="S1/R1",group=pivot_group, display = display.data_window)
+s2ColorInput = input.color(DEFAULT_COLOR, "S2", inline="S2/R2",group=pivot_group, display = display.data_window)
+s2ShowInput = input.bool(true, "", inline="S2/R2",group=pivot_group, display = display.data_window)
+r2ColorInput = input.color(DEFAULT_COLOR, "‏  ‏  ‏  ‏  ‏  ‏  ‏  ‏R2", inline="S2/R2",group=pivot_group, display = display.data_window)
+r2ShowInput = input.bool(true, "", inline="S2/R2",group=pivot_group, tooltip = "Not applicable to DM", display = display.data_window)
+s3ColorInput = input.color(DEFAULT_COLOR, "S3", inline="S3/R3",group=pivot_group, display = display.data_window)
+s3ShowInput = input.bool(true, "", inline="S3/R3",group=pivot_group, display = display.data_window)
+r3ColorInput = input.color(DEFAULT_COLOR, "‏  ‏  ‏  ‏  ‏  ‏  ‏  ‏R3", inline="S3/R3",group=pivot_group, display = display.data_window)
+r3ShowInput = input.bool(true, "", inline="S3/R3",group=pivot_group, tooltip = "Not applicable to DM", display = display.data_window)
+s4ColorInput = input.color(DEFAULT_COLOR, "S4", inline="S4/R4",group=pivot_group, display = display.data_window)
+s4ShowInput = input.bool(true, "", inline="S4/R4",group=pivot_group, display = display.data_window)
+r4ColorInput = input.color(DEFAULT_COLOR, "‏  ‏  ‏  ‏  ‏  ‏  ‏  ‏R4", inline="S4/R4",group=pivot_group, display = display.data_window)
+r4ShowInput = input.bool(true, "", inline="S4/R4",group=pivot_group, tooltip = "Not applicable to: Fibonacci, DM", display = display.data_window)
+s5ColorInput = input.color(DEFAULT_COLOR, "S5", inline="S5/R5",group=pivot_group, display = display.data_window)
+s5ShowInput = input.bool(true, "", inline="S5/R5",group=pivot_group, display = display.data_window)
+r5ColorInput = input.color(DEFAULT_COLOR, "‏  ‏  ‏  ‏  ‏  ‏  ‏  ‏R5", inline="S5/R5",group=pivot_group, display = display.data_window)
+r5ShowInput = input.bool(true, "", inline="S5/R5",group=pivot_group, tooltip = "Not applicable to: Fibonacci, Woodie, Classic, DM", display = display.data_window)
+
+// VWAP Settings
+vwap_group = "██████████ VWAP Settings ██████████" 
+switch_vwap = input(false, title="Show VWAP Line", group=vwap_group)
+hideonDWM = input(false, title="Hide VWAP on 1D or Above", group=vwap_group)
+var anchor = input.string(defval = "Session", title="Anchor Period",
+ options=["Session", "Week", "Month", "Quarter", "Year", "Decade", "Century", "Earnings", "Dividends", "Splits"], group=vwap_group)
+srcvwap = input(title = "Source", defval = hlc3, group=vwap_group)
+offsetvwap = input(0, title="Offset", group=vwap_group)
+
+showBand_1 = input(true, title="", group="Standard Deviation Bands Settings", inline="band_1")
+stdevMult_1 = input(1.0, title="Bands Multiplier #1", group="Standard Deviation Bands Settings", inline="band_1")
+showBand_2 = input(false, title="", group="Standard Deviation Bands Settings", inline="band_2")
+stdevMult_2 = input(2.0, title="Bands Multiplier #2", group="Standard Deviation Bands Settings", inline="band_2")
+showBand_3 = input(false, title="", group="Standard Deviation Bands Settings", inline="band_3")
+stdevMult_3 = input(3.0, title="Bands Multiplier #3", group="Standard Deviation Bands Settings", inline="band_3")
+
+// EMA Ribbon Settings
+ema_ribbon_group = "██████████ EMA Ribbon Settings ██████████"
+switch_ema_ribbon = input.bool(true, "Show EMA Ribbon", group=ema_ribbon_group)
+fast_ema = input.int(8, "Fast EMA", minval=1, group=ema_ribbon_group)
+pivot_ema = input.int(21, "Pivot EMA", minval=1, group=ema_ribbon_group)
+slow_ema = input.int(34, "Slow EMA", minval=1, group=ema_ribbon_group)
+ema55_len = input.int(55, "EMA 55 Length", minval=1, group=ema_ribbon_group)
+ema89_len = input.int(89, "EMA 89 Length", minval=1, group=ema_ribbon_group)
+
+// Keltner Channel & RSI Inputs
+keltner_rsi_group = "██████████ Keltner Channel & RSI ██████████"
+atr_len = input.int(14, "ATR Length (Keltner)", minval=1, group=keltner_rsi_group)
+rsi_len = input.int(2, "RSI Length (Entry Trigger)", minval=1, group=keltner_rsi_group)
+
+// MAs Line Settings
+ma_group = "██████████ MAs Line ██████████"
+switch_mas = input.bool(true, "Show MAs", group=ma_group)
+len1bool = input.bool(true, '', group = ma_group, inline = 'len1')
+len1 = input.int(50, title = 'MA 1', group = ma_group, inline = 'len1')
+string ma_1_type = input.string(defval = 'SMA', title = 'Type', options = ['RMA', 'SMA', 'EMA', 'WMA', 'HMA', 'VWMA'], inline = 'len1', group = ma_group)
+color ma_1_colour = input.color(color.new(color.orange, 50), '', inline = 'len1', group = ma_group)
+
+len2bool = input.bool(true, '', group = ma_group, inline = 'len2')
+len2 = input.int(100, minval = 1, title = 'MA 2', group = ma_group, inline = 'len2')
+string ma_2_type = input.string(defval = 'SMA', title = 'Type', options = ['RMA', 'SMA', 'EMA', 'WMA', 'HMA', 'VWMA'], inline = 'len2', group = ma_group)
+color ma_2_colour = input.color(color.new(color.orange, 25), '', inline = 'len2', group = ma_group)
+
+len3bool = input.bool(true, '', group = ma_group, inline = 'len3')
+len3 = input.int(200, minval = 1, title = 'MA 3', group = ma_group, inline = 'len3')
+string ma_3_type = input.string(defval = 'SMA', title = 'Type', options = ['RMA', 'SMA', 'EMA', 'WMA', 'HMA', 'VWMA'], inline = 'len3', group = ma_group)
+color ma_3_colour = input.color(color.new(color.orange, 0), '', inline = 'len3', group = ma_group)
+
+len4bool = input.bool(false, '', group = ma_group, inline = 'len4')
+len4 = input.int(50, minval = 1, title = 'MA 4', group = ma_group, inline = 'len4')
+string ma_4_type = input.string(defval = 'EMA', title = 'Type', options = ['RMA', 'SMA', 'EMA', 'WMA', 'HMA', 'VWMA'], inline = 'len4', group = ma_group)
+color ma_4_colour = input.color(color.new(color.blue, 0), '', inline = 'len4', group = ma_group)
+
+len5bool = input.bool(false, '', group = ma_group, inline = 'len5')
+len5 = input.int(200, minval = 1, title = 'MA 5', group = ma_group, inline = 'len5')
+string ma_5_type = input.string(defval = 'EMA', title = 'Type', options = ['RMA', 'SMA', 'EMA', 'WMA', 'HMA', 'VWMA'], inline = 'len5', group = ma_group)
+color ma_5_colour = input.color(color.new(color.white, 0), '', inline = 'len5', group = ma_group)
+
+// Vector Zone
+vz_group = "██████████ Vector Zone ██████████"
+switch_vectorzone = input(true, title="Show Vector Zone", group=vz_group)
+color redVectorColor = input.color(title='Vector: Red', group=vz_group, defval=color.red, inline='vectors')
+color greenVectorColor = input.color(title='Green', group=vz_group, defval=color.lime, inline='vectors')
+color violetVectorColor = input.color(title='Violet', group=vz_group, defval=color.fuchsia, inline='vectors')
+color blueVectorColor = input.color(title='Blue', group=vz_group, defval=color.blue, inline='vectors', tooltip='Bull bars are green and bear bars are red when the bar is with volume >= 200% of the average volume of the 10 previous bars, or bars where the product of candle spread x candle volume is >= the highest for the 10 previous bars.\n Bull bars are blue and bear are violet when the bar is with with volume >= 150% of the average volume of the 10 previous bars.')
+color regularCandleUpColor = input.color(title='Regular: Up Candle', group=vz_group, defval=#999999, inline='nonVectors')
+color regularCandleDownColor = input.color(title='Down Candle', group=vz_group, defval=#4d4d4d, inline='nonVectors', tooltip='Bull bars are light gray and bear are dark gray when none of the red/green/blue/violet vector conditions are met.')
+bool setcandlecolors = input.bool(false, title='Set PVSRA candle colors?', group=vz_group, inline='setCandle')
+int zonesMax = input.int(500, 'Maximum zones to draw', group=vz_group)
+string zoneType = input.string(group=vz_group, defval='Body only', title='Zone top/bottom is defined with: ', options=['Body only', 'Body with wicks'])
+string zoneUpdateType = input.string(group=vz_group, defval='Body with wicks', title='Zones are cleared using candle: ', options=['Body only', 'Body with wicks'])
+int borderWidth = input.int(0, 'Zone border width', group=vz_group)
+bool colorOverride = input.bool(true, 'Override color?' , group=vz_group, inline="vcz1")
+color zoneColor = input.color(title='Color', group=vz_group, defval=color.rgb(255, 230, 75, 90), inline="vcz1", tooltip='the vector candle zones color to use if you dont not want to use the PVSRA Candle Colors.')
+int transperancy = input.int(90, 'Zone Transperancy', minval = 0, maxval = 100, group=vz_group, tooltip='If the vector candle zones color is not overriden, then we want to set the transparancy of the vector candle colors as defined by the PBSRA candle colors. This setting only affects the candle zone colors not the candle colors themselves.')
+bool overrideSym = input.bool(group='PVSRA Override', title='Override chart symbol?', defval=false, inline='pvsra')
+string pvsraSym = input.string(group='PVSRA Override', title='', defval='INDEX:BTCUSD', tooltip='You can use INDEX:BTCUSD or you can combine multiple feeds, for example BINANCE:BTCUSDT+COINBASE:BTCUSD. Note that adding too many will slow things down.', inline='pvsra')
+
+// Visual Settings
+visual_group = 'Visual Settings'
+show_zigzag = input.bool(false, title = 'Show Zig Zag', group = visual_group, inline = '1')
+show_price_action_labels = input.bool(false, title = 'Show Price Action Labels', group = visual_group, inline = '2')
+supply_color = input.color(color.new(#EDEDED,70), title = 'Supply', group = visual_group, inline = '3')
+supply_outline_color = input.color(color.new(color.white,100), title = 'Outline', group = visual_group, inline = '3')
+demand_color = input.color(color.new(#00FFFF,70), title = 'Demand', group = visual_group, inline = '4')
+demand_outline_color = input.color(color.new(color.white,100), title = 'Outline', group = visual_group, inline = '4')
+poi_label_color = input.color(color.white, title = 'Market Pivot Label', group = visual_group, inline = '7')
+swing_type_color = input.color(color.black, title = 'Price Action Label', group = visual_group, inline = '8')
+zigzag_color = input.color(color.new(#000000,0), title = 'Zig Zag', group = visual_group, inline = '9')
+
+// --- User Defined Types & Methods ---
+type graphicSettings
+    string levelName
+    color levelColor
+    bool showLevel
+
+var graphicSettingsArray = array.from(
+      graphicSettings.new(" P", pColorInput, pShowInput),
+      graphicSettings.new("R1", r1ColorInput, r1ShowInput), graphicSettings.new("S1", s1ColorInput, s1ShowInput),
+      graphicSettings.new("R2", r2ColorInput, r2ShowInput), graphicSettings.new("S2", s2ColorInput, s2ShowInput),
+      graphicSettings.new("R3", r3ColorInput, r3ShowInput), graphicSettings.new("S3", s3ColorInput, s3ShowInput),
+      graphicSettings.new("R4", r4ColorInput, r4ShowInput), graphicSettings.new("S4", s4ColorInput, s4ShowInput),
+      graphicSettings.new("R5", r5ColorInput, r5ShowInput), graphicSettings.new("S5", s5ColorInput, s5ShowInput))
+
+type pivotGraphic
+    line pivotLine
+    label pivotLabel
+
+method delete(pivotGraphic graphic) =>
+    graphic.pivotLine.delete()
+    graphic.pivotLabel.delete()
+
+// --- Functions ---
+// Function to add new and remove last in array
+f_array_add_pop(array, new_value_to_add) =>
+    array.unshift(array, new_value_to_add)
+    array.pop(array)
+
+// Function Swing H & L Labels
+f_sh_sl_labels(array, swing_type) =>
+    var string label_text = na
+    if swing_type == 1
+        if array.get(array, 0) >= array.get(array, 1)
+            label_text := 'HH'
+        else
+            label_text := 'LH'
+        label.new(bar_index - swing_length, array.get(array,0), text = label_text, style=label.style_label_down, textcolor = swing_type_color, color = color.new(swing_type_color, 100), size = size.tiny)
+    
+    else if swing_type == -1
+        if array.get(array, 0) >= array.get(array, 1)
+            label_text := 'HL'
+        else
+            label_text := 'LL'
+        label.new(bar_index - swing_length, array.get(array,0), text = label_text, style=label.style_label_up, textcolor = swing_type_color, color = color.new(swing_type_color, 100), size = size.tiny)
+
+// Function Make Sure Supply Isnt Overlapping
+f_check_overlapping(new_poi, box_array, atrpoi) =>
+    atr_threshold = atrpoi * 2
+    okay_to_draw = true
+    for i = 0 to array.size(box_array) - 1
+        top = box.get_top(array.get(box_array, i))
+        bottom = box.get_bottom(array.get(box_array, i))
+        poi = (top + bottom) / 2
+        upper_boundary = poi + atr_threshold
+        lower_boundary = poi - atr_threshold
+        if new_poi >= lower_boundary and new_poi <= upper_boundary
+            okay_to_draw := false
+            break
+        else 
+            okay_to_draw := true
+    okay_to_draw
+
+// Function to draw Supply or Demand Zone
+f_supply_demand(value_array, bn_array, box_array, label_array, box_type, atrpoi) =>
+    atr_buffer = atrpoi * (box_width / 10)
+    box_left = array.get(bn_array, 0)
+    box_right = bar_index
+    var float box_top = 0.00
+    var float box_bottom = 0.00
+    var float poi = 0.00
+    if box_type == 1
+        box_top := array.get(value_array, 0)
+        box_bottom := box_top - atr_buffer
+        poi := (box_top + box_bottom) / 2
+    else if box_type == -1
+        box_bottom := array.get(value_array, 0)
+        box_top := box_bottom + atr_buffer
+        poi := (box_top + box_bottom) / 2
+    okay_to_draw = f_check_overlapping(poi, box_array, atrpoi)
+    if box_type == 1 and okay_to_draw and switch_poi
+        box.delete( array.get(box_array, array.size(box_array) - 1) )
+        f_array_add_pop(box_array, box.new( left = box_left, top = box_top, right = box_right, bottom = box_bottom, border_color = supply_outline_color,
+             bgcolor = supply_color, extend = extend.right, text = 'SUPPLY', text_halign = text.align_center, text_valign = text.align_center, text_color = poi_label_color, text_size = size.small, xloc = xloc.bar_index))
+        box.delete( array.get(label_array, array.size(label_array) - 1) )
+        f_array_add_pop(label_array, box.new( left = box_left, top = poi, right = box_right, bottom = poi, border_color = color.new(poi_label_color,90),
+             bgcolor = color.new(poi_label_color,90), extend = extend.right, text = 'IZ', text_halign = text.align_left, text_valign = text.align_center, text_color = poi_label_color, text_size = size.small, xloc = xloc.bar_index))
+    else if box_type == -1 and okay_to_draw  and switch_poi
+        box.delete( array.get(box_array, array.size(box_array) - 1) )
+        f_array_add_pop(box_array, box.new( left = box_left, top = box_top, right = box_right, bottom = box_bottom, border_color = demand_outline_color,
+             bgcolor = demand_color, extend = extend.right,  text = 'DEMAND', text_halign = text.align_center, text_valign = text.align_center, text_color = poi_label_color, text_size = size.small, xloc = xloc.bar_index))
+        box.delete( array.get(label_array, array.size(label_array) - 1) )
+        f_array_add_pop(label_array, box.new( left = box_left, top = poi, right = box_right, bottom = poi, border_color = color.new(poi_label_color,90),
+             bgcolor = color.new(poi_label_color,90), extend = extend.right,  text = 'IZ', text_halign = text.align_left, text_valign = text.align_center, text_color = poi_label_color, text_size = size.small, xloc = xloc.bar_index))
+
+// Function to change Supply/Demand to a BOS if broken
+f_sd_to_bos(box_array, bos_array, label_array, zone_type) =>
+    if zone_type == 1  and switch_poi
+        for i = 0 to array.size(box_array) - 1
+            level_to_break = box.get_top(array.get(box_array,i))
+            if close >= level_to_break
+                copied_box = box.copy(array.get(box_array,i))
+                f_array_add_pop(bos_array, copied_box)
+                mid = (box.get_top(array.get(box_array,i)) + box.get_bottom(array.get(box_array,i))) / 2
+                box.set_top(array.get(bos_array,0), mid)
+                box.set_bottom(array.get(bos_array,0), mid)
+                box.set_extend( array.get(bos_array,0), extend.none)
+                box.set_right( array.get(bos_array,0), bar_index)
+                box.set_text( array.get(bos_array,0), '' )
+                box.set_text_color( array.get(bos_array,0), color.new(color.white, 0))
+                box.set_text_size( array.get(bos_array,0), size.small)
+                box.set_text_halign( array.get(bos_array,0), text.align_center)
+                box.set_text_valign( array.get(bos_array,0), text.align_center)
+                box.delete(array.get(box_array, i))
+                box.delete(array.get(label_array, i))
+    if zone_type == -1  and switch_poi
+        for i = 0 to array.size(box_array) - 1
+            level_to_break = box.get_bottom(array.get(box_array,i))
+            if close <= level_to_break
+                copied_box = box.copy(array.get(box_array,i))
+                f_array_add_pop(bos_array, copied_box)
+                mid = (box.get_top(array.get(box_array,i)) + box.get_bottom(array.get(box_array,i))) / 2
+                box.set_top(array.get(bos_array,0), mid)
+                box.set_bottom(array.get(bos_array,0), mid)
+                box.set_extend( array.get(bos_array,0), extend.none)
+                box.set_right( array.get(bos_array,0), bar_index)
+                box.set_text( array.get(bos_array,0), '' )
+                box.set_text_color( array.get(bos_array,0),  color.new(color.white, 0))
+                box.set_text_size( array.get(bos_array,0), size.small)
+                box.set_text_halign( array.get(bos_array,0), text.align_center)
+                box.set_text_valign( array.get(bos_array,0), text.align_center)
+                box.delete(array.get(box_array, i))
+                box.delete(array.get(label_array, i))
+
+// Function manage current boxes by changing endpoint
+f_extend_box_endpoint(box_array) =>
+    for i = 0 to array.size(box_array) - 1
+        box.set_right(array.get(box_array, i), bar_index + 100)
+
+// Function to calculate moving averages
+ma_function(source, length, maType) =>
+    switch maType
+        "RMA"  => ta.rma(source, length)
+        "SMA"  => ta.sma(source, length)
+        "EMA"  => ta.ema(source, length)
+        "WMA"  => ta.wma(source, length)
+        "HMA"  => ta.hma(source, length)
+        "VWMA" => ta.vwma(source, length)
+        => na
+
+// Functions for PVSRA
+pvsraVolume(overrideSymbolX, pvsraSymbolX, tickerIdX) =>
+    request.security(overrideSymbolX ? pvsraSymbolX : tickerIdX, '', volume, barmerge.gaps_off, barmerge.lookahead_off)
+pvsraHigh(overrideSymbolX, pvsraSymbolX, tickerIdX) =>
+    request.security(overrideSymbolX ? pvsraSymbolX : tickerIdX, '', high, barmerge.gaps_off, barmerge.lookahead_off)
+pvsraLow(overrideSymbolX, pvsraSymbolX, tickerIdX) =>
+    request.security(overrideSymbolX ? pvsraSymbolX : tickerIdX, '', low, barmerge.gaps_off, barmerge.lookahead_off)
+pvsraClose(overrideSymbolX, pvsraSymbolX, tickerIdX) =>
+    request.security(overrideSymbolX ? pvsraSymbolX : tickerIdX, '', close, barmerge.gaps_off, barmerge.lookahead_off)
+pvsraOpen(overrideSymbolX, pvsraSymbolX, tickerIdX) =>
+    request.security(overrideSymbolX ? pvsraSymbolX : tickerIdX, '', open, barmerge.gaps_off, barmerge.lookahead_off)
+
+// --- Calculations ---
+
+// EMA Ribbon
+fast_ema_value = ta.ema(close, fast_ema)
+pivot_ema_value = ta.ema(close, pivot_ema)
+slow_ema_value = ta.ema(close, slow_ema)
+ema55_value = ta.ema(close, ema55_len)
+ema89_value = ta.ema(close, ema89_len)
+
+// Keltner Channels & RSI Triggers
+atr_value = ta.atr(atr_len)
+kc_upper1 = pivot_ema_value + (1 * atr_value)
+kc_lower1 = pivot_ema_value - (1 * atr_value)
+kc_upper2 = pivot_ema_value + (2 * atr_value)
+kc_lower2 = pivot_ema_value - (2 * atr_value)
+kc_upper3 = pivot_ema_value + (3 * atr_value)
+kc_lower3 = pivot_ema_value - (3 * atr_value)
+rsi_value = ta.rsi(close, rsi_len)
+is_in_entry_zone = close >= kc_lower1 and close <= kc_upper1
+bullish_rsi_trigger = ta.cross(rsi_value, 10) and rsi_value > 10
+bearish_rsi_trigger = ta.cross(90, rsi_value) and rsi_value < 90
+
+// Inflection Zones (Supply & Demand)
+atrpoi = ta.atr(50)
+swing_high = ta.pivothigh(high, swing_length, swing_length)
+swing_low = ta.pivotlow(low, swing_length, swing_length)
+var swing_high_values = array.new_float(5,0.00)
+var swing_low_values = array.new_float(5,0.00)
+var swing_high_bns = array.new_int(5,0)
+var swing_low_bns = array.new_int(5,0)
+var current_supply_box = array.new_box(history_of_demand_to_keep, na)
+var current_demand_box = array.new_box(history_of_demand_to_keep, na)
+var current_supply_poi = array.new_box(history_of_demand_to_keep, na)
+var current_demand_poi = array.new_box(history_of_demand_to_keep, na)
+var supply_bos = array.new_box(5, na)
+var demand_bos = array.new_box(5, na)
+if not na(swing_high)
+    f_array_add_pop(swing_high_values, swing_high)
+    f_array_add_pop(swing_high_bns, bar_index[swing_length])
+    if show_price_action_labels
+        f_sh_sl_labels(swing_high_values, 1)
+    f_supply_demand(swing_high_values, swing_high_bns, current_supply_box, current_supply_poi, 1, atrpoi)
+else if not na(swing_low)
+    f_array_add_pop(swing_low_values, swing_low)
+    f_array_add_pop(swing_low_bns, bar_index[swing_length])
+    if show_price_action_labels
+        f_sh_sl_labels(swing_low_values, -1)
+    f_supply_demand(swing_low_values, swing_low_bns, current_demand_box, current_demand_poi, -1, atrpoi)
+f_sd_to_bos(current_supply_box, supply_bos, current_supply_poi, 1)
+f_sd_to_bos(current_demand_box, demand_bos, current_demand_poi, -1)
+f_extend_box_endpoint(current_supply_box)
+f_extend_box_endpoint(current_demand_box)
+
+// Zig Zag
+h = ta.highest(high, swing_length * 2 + 1)
+l = ta.lowest(low, swing_length * 2 + 1)
+f_isMin(len) => l == low[len]
+f_isMax(len) => h == high[len]
+var dirUp = false
+var lastLow = high * 100
+var lastHigh = 0.0
+var timeLow = bar_index
+var timeHigh = bar_index
+var line li = na
+f_drawLine() =>
+    _li_color = show_zigzag and switch_poi ? zigzag_color : color.new(#ffffff,100)
+    line.new(timeHigh - swing_length, lastHigh, timeLow - swing_length, lastLow, xloc.bar_index, color=_li_color, width=2)
+if dirUp
+    if f_isMin(swing_length) and low[swing_length] < lastLow
+        lastLow := low[swing_length]
+        timeLow := bar_index
+        line.delete(li)
+        li := f_drawLine()
+    if f_isMax(swing_length) and high[swing_length] > lastLow
+        lastHigh := high[swing_length]
+        timeHigh := bar_index
+        dirUp := false
+        li := f_drawLine()
+if not dirUp
+    if f_isMax(swing_length) and high[swing_length] > lastHigh
+        lastHigh := high[swing_length]
+        timeHigh := bar_index
+        line.delete(li)
+        li := f_drawLine()
+    if f_isMin(swing_length) and low[swing_length] < lastHigh
+        lastLow := low[swing_length]
+        timeLow := bar_index
+        dirUp := true
+        li := f_drawLine()
+        if f_isMax(swing_length) and high[swing_length] > lastLow
+            lastHigh := high[swing_length]
+            timeHigh := bar_index
+            dirUp := false
+            li := f_drawLine()
+
+// Pivot Levels
+var drawnGraphics = matrix.new<pivotGraphic>()
+autoAnchor = switch
+    timeframe.isintraday => timeframe.multiplier <= 15 ? "1D" : "1W"
+    timeframe.isdaily    => "1M"
+    => "12M"
+pivotTimeframe = switch pivotAnchorInput
+    "Auto"      => autoAnchor
+    "Daily"     => "1D"
+    "Weekly"    => "1W"
+    "Monthly"   => "1M"
+    "Quarterly" => "3M"
+    => "12M"
+pivotYearMultiplier = switch pivotAnchorInput
+    "Biyearly"       => 2
+    "Triyearly"      => 3
+    "Quinquennially" => 5
+    "Decennially"    => 10
+    => 1
+localPivotTimeframeChange = timeframe.change(pivotTimeframe) and year % pivotYearMultiplier == 0
+securityPivotTimeframeChange = timeframe.change(timeframe.period) and year % pivotYearMultiplier == 0
+pivotTimeframeChangeCounter(condition) => 
+    var count = 0
+    if condition and bar_index > 0
+        count += 1
+    count
+localPivots = ta.pivot_point_levels(pivotTypeInput, localPivotTimeframeChange)
+securityPivotPointsArray = ta.pivot_point_levels(pivotTypeInput, securityPivotTimeframeChange)
+[securityPivots, securityPivotCounter] = request.security(syminfo.tickerid, pivotTimeframe, [securityPivotPointsArray, pivotTimeframeChangeCounter(securityPivotTimeframeChange)], lookahead = barmerge.lookahead_on)
+pivotPointsArray = isDailyBasedInput ? securityPivots : localPivots
+affixOldPivots(endTime) =>
+    if drawnGraphics.rows() > 0
+        lastGraphics = drawnGraphics.row(drawnGraphics.rows() - 1)
+        for graphic in lastGraphics
+            graphic.pivotLine.set_x2(endTime)
+            if positionLabelsInput == "Right"
+                graphic.pivotLabel.set_x(endTime)
+drawNewPivots(startTime) =>
+    newGraphics = array.new<pivotGraphic>()
+    for [index, coord] in pivotPointsArray
+        levelSettings = graphicSettingsArray.get(index)
+        if not na(coord) and levelSettings.showLevel and switch_pivot
+            lineEndTime = startTime + timeframe.in_seconds(pivotTimeframe) * 1000 * pivotYearMultiplier
+            pivotLine = line.new(startTime, coord, lineEndTime, coord, xloc = xloc.bar_time, color=levelSettings.levelColor, width=linewidthInput)
+            pivotLabel = label.new(x = positionLabelsInput == "Left" ? startTime : lineEndTime,
+                               y = coord,
+                               text = (showLabelsInput ? levelSettings.levelName + " " : "") + (showPricesInput ? "(" + str.tostring(coord, format.mintick) + ")" : ""),
+                               style = positionLabelsInput == "Left" ? label.style_label_right : label.style_label_left,
+                               textcolor = levelSettings.levelColor,
+                               color = #00000000,
+                               xloc=xloc.bar_time)
+            newGraphics.push(pivotGraphic.new(pivotLine, pivotLabel))
+    
+    drawnGraphics.add_row(array_id = newGraphics)
+    if drawnGraphics.rows() > maxHistoricalPivotsInput
+        oldGraphics = drawnGraphics.remove_row(0)
+        for graphic in oldGraphics
+            graphic.delete()
+localPivotDrawConditionStatic = not isDailyBasedInput and localPivotTimeframeChange
+securityPivotDrawConditionStatic = isDailyBasedInput and securityPivotCounter != securityPivotCounter[1]
+var isMultiYearly = array.from("Biyearly", "Triyearly", "Quinquennially", "Decennially").includes(pivotAnchorInput)
+localPivotDrawConditionDeveloping = not isDailyBasedInput and time_close == time_close(pivotTimeframe) and not isMultiYearly 
+securityPivotDrawConditionDeveloping = false
+if switch_pivot and (securityPivotDrawConditionStatic or localPivotDrawConditionStatic)
+    affixOldPivots(time)
+    drawNewPivots(time)
+if not switch_pivot and drawnGraphics.rows() > 0
+    for i = drawnGraphics.rows() - 1 to 0
+        oldGraphics = drawnGraphics.remove_row(i)
+        for graphic in oldGraphics
+            graphic.delete()
+var FIRST_BAR_TIME = time
+if barstate.islastconfirmedhistory and drawnGraphics.columns() == 0 and switch_pivot
+    if not na(securityPivots) and securityPivotCounter > 0
+        if isDailyBasedInput
+            drawNewPivots(FIRST_BAR_TIME)
+        else 
+            runtime.error("Not enough intraday data to calculate Pivot Points. Lower the Pivots Timeframe or turn on the 'Use Daily-based Values' option in the indicator settings.")
+    else
+        runtime.error("Not enough data to calculate Pivot Points. Lower the Pivots Timeframe in the indicator settings.")
+
+// VWAP
+if barstate.islast and ta.cum(volume) == 0
+    runtime.error("No volume is provided by the data vendor.")
+new_earnings = request.earnings(syminfo.tickerid, earnings.actual, barmerge.gaps_on, barmerge.lookahead_on, ignore_invalid_symbol=true)
+new_dividends = request.dividends(syminfo.tickerid, dividends.gross, barmerge.gaps_on, barmerge.lookahead_on, ignore_invalid_symbol=true)
+new_split = request.splits(syminfo.tickerid, splits.denominator, barmerge.gaps_on, barmerge.lookahead_on, ignore_invalid_symbol=true)
+isNewPeriod = switch anchor
+    "Earnings"  => not na(new_earnings)
+    "Dividends" => not na(new_dividends)
+    "Splits"    => not na(new_split)
+    "Session"   => timeframe.change("D")
+    "Week"      => timeframe.change("W")
+    "Month"     => timeframe.change("M")
+    "Quarter"   => timeframe.change("3M")
+    "Year"      => timeframe.change("12M")
+    "Decade"    => timeframe.change("12M") and year % 10 == 0
+    "Century"   => timeframe.change("12M") and year % 100 == 0
+    => false
+isEsdAnchor = anchor == "Earnings" or anchor == "Dividends" or anchor == "Splits"
+if na(srcvwap[1]) and not isEsdAnchor
+    isNewPeriod := true
+float vwapValue = na
+float upperBandValue1 = na
+float lowerBandValue1 = na
+float upperBandValue2 = na
+float lowerBandValue2 = na
+float upperBandValue3 = na
+float lowerBandValue3 = na
+if not (hideonDWM and timeframe.isdwm)
+    [_vwap, _stdevUpper, _] = ta.vwap(srcvwap, isNewPeriod, 1)
+    vwapValue := _vwap
+    stdevAbs = _stdevUpper - _vwap
+    upperBandValue1 := _vwap + stdevAbs * stdevMult_1
+    lowerBandValue1 := _vwap - stdevAbs * stdevMult_1
+    upperBandValue2 := _vwap + stdevAbs * stdevMult_2
+    lowerBandValue2 := _vwap - stdevAbs * stdevMult_2
+    upperBandValue3 := _vwap + stdevAbs * stdevMult_3
+    lowerBandValue3 := _vwap - stdevAbs * stdevMult_3
+
+// MAs Lines
+ema1 = request.security(syminfo.tickerid, timeframe.period, ma_function(close, len1, ma_1_type))
+ema2 = request.security(syminfo.tickerid, timeframe.period, ma_function(close, len2, ma_2_type))
+ema3 = request.security(syminfo.tickerid, timeframe.period, ma_function(close, len3, ma_3_type))
+ema4 = request.security(syminfo.tickerid, timeframe.period, ma_function(close, len4, ma_4_type))
+ema5 = request.security(syminfo.tickerid, timeframe.period, ma_function(close, len5, ma_5_type))
+
+// Vector Zone
+pvsraVolume = pvsraVolume(overrideSym, pvsraSym, syminfo.tickerid)
+pvsraHigh = pvsraHigh(overrideSym, pvsraSym, syminfo.tickerid)
+pvsraLow = pvsraLow(overrideSym, pvsraSym, syminfo.tickerid)
+pvsraClose = pvsraClose(overrideSym, pvsraSym, syminfo.tickerid)
+pvsraOpen = pvsraOpen(overrideSym, pvsraSym, syminfo.tickerid)
+[pvsraColor, alertFlag, averageVolume, volumeSpread, highestVolumeSpread] = trLib.calcPvsra(pvsraVolume, pvsraHigh, pvsraLow, pvsraClose, pvsraOpen, redVectorColor, greenVectorColor, violetVectorColor, blueVectorColor, regularCandleDownColor, regularCandleUpColor)
+var zoneBoxesAbove = array.new_box()
+var zoneBoxesBelow = array.new_box()
+
+// --- Plotting ---
+
+// EMA Ribbon
+p_fast = plot(switch_ema_ribbon ? fast_ema_value : na, "Fast EMA", color.new(color.gray, 0))
+p_pivot = plot(switch_ema_ribbon ? pivot_ema_value : na, "Pivot EMA", color.new(color.gray, 0))
+p_slow = plot(switch_ema_ribbon ? slow_ema_value : na, "Slow EMA", color.new(color.gray, 0))
+plot(switch_ema_ribbon ? ema55_value : na, "EMA 55", color.new(color.maroon, 0), 2)
+plot(switch_ema_ribbon ? ema89_value : na, "EMA 89", color.new(color.navy, 0), 2)
+
+// Keltner Channel Bands
+p_kc_upper1 = plot(kc_upper1, "KC Upper 1", color.new(color.silver, 80))
+p_kc_lower1 = plot(kc_lower1, "KC Lower 1", color.new(color.silver, 80))
+p_kc_upper2 = plot(kc_upper2, "KC Upper 2", color.new(color.gray, 80))
+p_kc_lower2 = plot(kc_lower2, "KC Lower 2", color.new(color.gray, 80))
+p_kc_upper3 = plot(kc_upper3, "KC Upper 3", color.new(color.white, 80))
+p_kc_lower3 = plot(kc_lower3, "KC Lower 3", color.new(color.white, 90))
+
+// RSI Entry Triggers
+plot(is_in_entry_zone and bullish_rsi_trigger ? low - (atr_value * 0.5) : na, "Bullish Entry Trigger", color.lime, 2, style=plot.style_circles)
+plot(is_in_entry_zone and bearish_rsi_trigger ? high + (atr_value * 0.5) : na, "Bearish Entry Trigger", color.red, 2, style=plot.style_circles)
+
+// VWAP
+plot(switch_vwap? vwapValue:na, title="VWAP", color=#6A0DAD, linewidth = 2, offset=offsetvwap)
+plot(showBand_1? upperBandValue1 : na, title="VWAP Upper Band 1", color=#6A0DAD, linewidth=1)
+plot(showBand_1? lowerBandValue1 : na, title="VWAP Lower Band 1", color=#6A0DAD, linewidth=1)
+plot(showBand_2? upperBandValue2 : na, title="VWAP Upper Band 2", color=#6A0DAD, linewidth=1)
+plot(showBand_2? lowerBandValue2 : na, title="VWAP Lower Band 2", color=#6A0DAD, linewidth=1)
+plot(showBand_3? upperBandValue3 : na, title="VWAP Upper Band 3", color=#6A0DAD, linewidth=1)
+plot(showBand_3? lowerBandValue3 : na, title="VWAP Lower Band 3", color=#6A0DAD, linewidth=1)
+
+// MAs Lines
+plot(len1bool and switch_mas ? ema1 : na, color = ma_1_colour, linewidth = 1, title = 'MA 1')
+plot(len2bool and switch_mas ? ema2 : na, color = ma_2_colour, linewidth = 1, title = 'MA 2')
+plot(len3bool and switch_mas ? ema3 : na, color = ma_3_colour, linewidth = 1, title = 'MA 3')
+plot(len4bool and switch_mas ? ema4 : na, color = ma_4_colour, linewidth = 1, title = 'MA 4')
+plot(len5bool and switch_mas ? ema5 : na, color = ma_5_colour, linewidth = 1, title = 'MA 5')
+
+// EMA Ribbon Fill
+fill_color_fp = fast_ema_value >= pivot_ema_value ? color.new(color.green, 70) : color.new(color.red, 70)
+fill_color_ps = pivot_ema_value >= slow_ema_value ? color.new(color.blue, 70) : color.new(color.orange, 70)
+fill(p_fast, p_pivot, switch_ema_ribbon ? fill_color_fp : na, "Fast-Pivot Fill")
+fill(p_pivot, p_slow, switch_ema_ribbon ? fill_color_ps : na, "Pivot-Slow Fill")
+
+// Keltner Channel Fill
+fill(p_kc_upper1, p_kc_upper2, color.new(color.teal, 95), "KC Upper 1-2 Fill")
+fill(p_kc_upper2, p_kc_upper3, color.new(color.teal, 95), "KC Upper 2-3 Fill")
+fill(p_kc_lower1, p_kc_lower2, color.new(color.yellow, 95), "KC Lower 1-2 Fill")
+fill(p_kc_lower2, p_kc_lower3, color.new(color.yellow, 95), "KC Lower 2-3 Fill")
+
+// Vector Zone
+barcolor(setcandlecolors ? pvsraColor : na)
+pvsra = trLib.getPvsraFlagByColor(switch_vectorzone ? pvsraColor:na, redVectorColor, greenVectorColor, violetVectorColor, blueVectorColor, regularCandleUpColor)
+trLib.updateZones(pvsra, 0, zoneBoxesBelow, zonesMax, pvsraHigh, pvsraLow, pvsraOpen, pvsraClose, transperancy, zoneUpdateType, zoneColor, zoneType, borderWidth, colorOverride, redVectorColor, greenVectorColor, violetVectorColor, blueVectorColor)
+trLib.updateZones(pvsra, 1, zoneBoxesAbove, zonesMax, pvsraHigh, pvsraLow, pvsraOpen, pvsraClose, transperancy, zoneUpdateType, zoneColor, zoneType, borderWidth, colorOverride, redVectorColor, greenVectorColor, violetVectorColor, blueVectorColor)
+trLib.cleanarr(zoneBoxesAbove)
+trLib.cleanarr(zoneBoxesBelow)
+
+// Credits section
+credits_group = "Compiled By"
+credits = input.string(title="Compiled by", defval="@mphinance & Combined by AI", group=credits_group, inline="credits", options=["@mphinance & Combined by AI"])
